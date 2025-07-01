@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maze Mouse Game</title>
+    <style>
+        body, html { margin: 0; padding: 0; overflow: hidden; }
+        #timer {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 20px;
+            font-family: sans-serif;
+            z-index: 1;
+        }
+        #instructions {
+            position: absolute;
+            top: 50%;
+            width: 100%;
+            text-align: center;
+            color: white;
+            font-family: sans-serif;
+            font-size: 24px;
+        }
+    </style>
+</head>
+<body>
+<div id="timer">Time: 0.0s</div>
+<div id="instructions">Click to start</div>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js';
+import { PointerLockControls } from 'https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/controls/PointerLockControls.js';
+
+let camera, scene, renderer, controls;
+let timerEl = document.getElementById('timer');
+let instructions = document.getElementById('instructions');
+let startTime = null;
+let timerInterval;
+
+const maze = [
+    [1,1,1,1,1,1,1],
+    [1,0,0,0,0,0,1],
+    [1,0,1,1,1,0,1],
+    [1,0,1,0,1,0,1],
+    [1,0,1,0,0,0,1],
+    [1,0,1,1,1,0,1],
+    [1,0,0,0,0,0,1],
+    [1,1,1,1,1,1,1]
+];
+
+const cellSize = 10;
+const mazeHeight = maze.length;
+const mazeWidth = maze[0].length;
+
+init();
+
+function init() {
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x000000);
+
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 1000);
+
+    renderer = new THREE.WebGLRenderer();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    controls = new PointerLockControls(camera, document.body);
+    scene.add(controls.getObject());
+
+    const floorGeometry = new THREE.PlaneGeometry(mazeWidth * cellSize, mazeHeight * cellSize);
+    const floorMaterial = new THREE.MeshBasicMaterial({color: 0x808080});
+    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+    floor.rotation.x = -Math.PI / 2;
+    scene.add(floor);
+
+    const wallGeometry = new THREE.BoxGeometry(cellSize, cellSize, cellSize);
+    const wallMaterial = new THREE.MeshBasicMaterial({color: 0xaaaaaa});
+    for (let z=0; z<mazeHeight; z++) {
+        for (let x=0; x<mazeWidth; x++) {
+            if (maze[z][x] === 1) {
+                const wall = new THREE.Mesh(wallGeometry, wallMaterial);
+                wall.position.set((x - mazeWidth/2) * cellSize + cellSize/2, cellSize/2, (z - mazeHeight/2) * cellSize + cellSize/2);
+                scene.add(wall);
+            }
+        }
+    }
+
+    controls.getObject().position.set(-mazeWidth * cellSize/2 + cellSize*1.5, cellSize/2, -mazeHeight * cellSize/2 + cellSize*1.5);
+
+    const exitGeometry = new THREE.BoxGeometry(cellSize, cellSize/2, cellSize);
+    const exitMaterial = new THREE.MeshBasicMaterial({color: 0x00ff00});
+    const exit = new THREE.Mesh(exitGeometry, exitMaterial);
+    exit.position.set((mazeWidth-2 - mazeWidth/2) * cellSize + cellSize/2, cellSize/4, (mazeHeight-2 - mazeHeight/2) * cellSize + cellSize/2);
+    scene.add(exit);
+
+    instructions.addEventListener('click', () => {
+        controls.lock();
+    });
+
+    controls.addEventListener('lock', () => {
+        instructions.style.display = 'none';
+        startTimer();
+    });
+
+    controls.addEventListener('unlock', () => {
+        instructions.style.display = '';
+        stopTimer();
+    });
+
+    window.addEventListener('resize', onWindowResize);
+
+    animate();
+}
+
+function startTimer() {
+    startTime = performance.now();
+    timerInterval = setInterval(() => {
+        const elapsed = ((performance.now() - startTime) / 1000).toFixed(1);
+        timerEl.textContent = `Time: ${elapsed}s`;
+        checkWin();
+    }, 100);
+}
+
+function stopTimer() {
+    clearInterval(timerInterval);
+}
+
+function checkWin() {
+    const pos = controls.getObject().position;
+    const exitX = (mazeWidth-2 - mazeWidth/2) * cellSize + cellSize/2;
+    const exitZ = (mazeHeight-2 - mazeHeight/2) * cellSize + cellSize/2;
+    const distance = Math.sqrt((pos.x - exitX) ** 2 + (pos.z - exitZ) ** 2);
+    if (distance < cellSize/2) {
+        stopTimer();
+        alert(`You escaped the maze in ${timerEl.textContent.split(' ')[1]}!`);
+        controls.unlock();
+    }
+}
+
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    renderer.render(scene, camera);
+}
+</script>
+</body>
+</html>
